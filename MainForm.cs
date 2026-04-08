@@ -13,7 +13,7 @@ internal sealed class MainForm : Form
 	private readonly NumericUpDown horizontalOffsetInput;
 	private readonly TextBox outputPathTextBox;
 	private readonly Button drawButton;
-	private readonly PictureBox previewPictureBox;
+	private readonly ZoomablePreviewControl previewControl;
 	private readonly Label previewStatusLabel;
 
 	public MainForm()
@@ -65,12 +65,10 @@ internal sealed class MainForm : Form
 			Anchor = AnchorStyles.Right
 		};
 
-		previewPictureBox = new PictureBox
+		previewControl = new ZoomablePreviewControl
 		{
 			Dock = DockStyle.Fill,
-			BorderStyle = BorderStyle.FixedSingle,
-			BackColor = Color.White,
-			SizeMode = PictureBoxSizeMode.Zoom
+			BackColor = Color.White
 		};
 
 		previewStatusLabel = new Label
@@ -96,6 +94,7 @@ internal sealed class MainForm : Form
 		verticalOffsetInput.ValueChanged += PreviewInputChanged;
 		horizontalSpacingInput.ValueChanged += PreviewInputChanged;
 		horizontalOffsetInput.ValueChanged += PreviewInputChanged;
+		previewControl.ZoomChanged += PreviewControl_ZoomChanged;
 
 		layout.Controls.Add(CreateLabel("图片文件"), 0, 0);
 		layout.Controls.Add(imagePathTextBox, 1, 0);
@@ -137,7 +136,7 @@ internal sealed class MainForm : Form
 		previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
 
 		previewLayout.Controls.Add(CreateLabel("输出预览"), 0, 0);
-		previewLayout.Controls.Add(previewPictureBox, 0, 1);
+		previewLayout.Controls.Add(previewControl, 0, 1);
 		previewLayout.Controls.Add(previewStatusLabel, 0, 2);
 
 		splitContainer.Panel1.Controls.Add(layout);
@@ -195,6 +194,11 @@ internal sealed class MainForm : Form
 	private void PreviewInputChanged(object? sender, EventArgs e)
 	{
 		UpdatePreview();
+	}
+
+	private void PreviewControl_ZoomChanged(object? sender, EventArgs e)
+	{
+		UpdatePreviewStatus();
 	}
 
 	private void MainForm_Shown(object? sender, EventArgs e)
@@ -290,7 +294,7 @@ internal sealed class MainForm : Form
 				DecimalToInt(horizontalOffsetInput.Value));
 
 			ReplacePreviewImage(previewImage);
-			previewStatusLabel.Text = $"预览已更新，尺寸：{previewImage.Width} x {previewImage.Height}";
+			UpdatePreviewStatus();
 		}
 		catch (Exception ex)
 		{
@@ -299,10 +303,20 @@ internal sealed class MainForm : Form
 		}
 	}
 
+	private void UpdatePreviewStatus()
+	{
+		if (previewControl.PreviewImage is null)
+		{
+			return;
+		}
+
+		previewStatusLabel.Text = $"预览已更新，尺寸：{previewControl.PreviewImage.Width} x {previewControl.PreviewImage.Height}，缩放：{previewControl.ZoomPercentage:0}%（鼠标滚轮缩放）";
+	}
+
 	private void ReplacePreviewImage(Image? image)
 	{
-		var oldImage = previewPictureBox.Image;
-		previewPictureBox.Image = image;
+		var oldImage = previewControl.PreviewImage;
+		previewControl.PreviewImage = image;
 		oldImage?.Dispose();
 	}
 
