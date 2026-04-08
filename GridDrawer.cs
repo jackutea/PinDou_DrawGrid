@@ -22,11 +22,38 @@ internal static class GridDrawer
 		int horizontalSpacing,
 		int horizontalOffset)
 	{
-		var extension = ValidateArguments(imagePath, verticalSpacing, verticalOffset, horizontalSpacing, horizontalOffset);
+		return DrawGrid(
+			imagePath,
+			verticalSpacing,
+			verticalOffset,
+			horizontalSpacing,
+			horizontalOffset,
+			BuildOutputPath(imagePath));
+	}
+
+	public static string DrawGrid(
+		string imagePath,
+		int verticalSpacing,
+		int verticalOffset,
+		int horizontalSpacing,
+		int horizontalOffset,
+		string outputPath)
+	{
+		ValidateArguments(imagePath, verticalSpacing, verticalOffset, horizontalSpacing, horizontalOffset);
+		var outputExtension = ValidateOutputPath(outputPath);
 		using var canvas = CreateGridBitmap(imagePath, verticalSpacing, verticalOffset, horizontalSpacing, horizontalOffset);
-		var outputPath = BuildOutputPath(imagePath);
-		canvas.Save(outputPath, GetImageFormat(extension));
+		canvas.Save(outputPath, GetImageFormat(outputExtension));
 		return outputPath;
+	}
+
+	public static string GetSuggestedOutputPath(string imagePath)
+	{
+		if (string.IsNullOrWhiteSpace(imagePath))
+		{
+			throw new ArgumentException("图片路径不能为空。", nameof(imagePath));
+		}
+
+		return BuildOutputPath(imagePath);
 	}
 
 	public static Bitmap CreateGridBitmap(
@@ -96,6 +123,28 @@ internal static class GridDrawer
 		if (!SupportedExtensions.Contains(extension))
 		{
 			throw new NotSupportedException("仅支持 .png、.bmp、.jpg 和 .jpeg 图片。");
+		}
+
+		return extension;
+	}
+
+	private static string ValidateOutputPath(string outputPath)
+	{
+		if (string.IsNullOrWhiteSpace(outputPath))
+		{
+			throw new ArgumentException("导出路径不能为空。", nameof(outputPath));
+		}
+
+		var extension = Path.GetExtension(outputPath);
+		if (!SupportedExtensions.Contains(extension))
+		{
+			throw new NotSupportedException("导出文件仅支持 .png、.bmp、.jpg 和 .jpeg。\n");
+		}
+
+		var directory = Path.GetDirectoryName(outputPath);
+		if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+		{
+			throw new DirectoryNotFoundException("导出目录不存在。");
 		}
 
 		return extension;

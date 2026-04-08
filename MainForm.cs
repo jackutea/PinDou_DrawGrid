@@ -60,7 +60,7 @@ internal sealed class MainForm : Form
 
 		drawButton = new Button
 		{
-			Text = "生成网格图",
+			Text = "导出网格图",
 			AutoSize = true,
 			Anchor = AnchorStyles.Right
 		};
@@ -217,16 +217,22 @@ internal sealed class MainForm : Form
 		try
 		{
 			drawButton.Enabled = false;
-			outputPathTextBox.Clear();
+			var outputPath = SelectOutputPath();
+			if (outputPath is null)
+			{
+				return;
+			}
 
-			var outputPath = GridDrawer.DrawGrid(
+			outputPathTextBox.Text = outputPath;
+
+			GridDrawer.DrawGrid(
 				imagePathTextBox.Text,
 				DecimalToInt(verticalSpacingInput.Value),
 				DecimalToInt(verticalOffsetInput.Value),
 				DecimalToInt(horizontalSpacingInput.Value),
-				DecimalToInt(horizontalOffsetInput.Value));
+				DecimalToInt(horizontalOffsetInput.Value),
+				outputPath);
 
-			outputPathTextBox.Text = outputPath;
 			MessageBox.Show(this, $"网格图片已生成:\n{outputPath}", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
 		}
 		catch (Exception ex)
@@ -242,6 +248,25 @@ internal sealed class MainForm : Form
 	private void ShowError(string message)
 	{
 		MessageBox.Show(this, message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+	}
+
+	private string? SelectOutputPath()
+	{
+		var suggestedPath = GridDrawer.GetSuggestedOutputPath(imagePathTextBox.Text);
+
+		using var dialog = new SaveFileDialog
+		{
+			Title = "选择导出路径",
+			Filter = "PNG 图片|*.png|BMP 图片|*.bmp|JPEG 图片|*.jpg;*.jpeg",
+			AddExtension = true,
+			OverwritePrompt = true,
+			CheckPathExists = true,
+			InitialDirectory = Path.GetDirectoryName(suggestedPath),
+			FileName = Path.GetFileName(suggestedPath),
+			DefaultExt = Path.GetExtension(suggestedPath).TrimStart('.')
+		};
+
+		return dialog.ShowDialog(this) == DialogResult.OK ? dialog.FileName : null;
 	}
 
 	private void UpdatePreview()
