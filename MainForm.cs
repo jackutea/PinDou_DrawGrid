@@ -2,6 +2,10 @@ namespace DrawGrid;
 
 internal sealed class MainForm : Form
 {
+	private const int InitialLeftPanelWidth = 420;
+	private const int LeftPanelMinWidth = 380;
+	private const int RightPanelMinWidth = 420;
+	private readonly SplitContainer splitContainer;
 	private readonly TextBox imagePathTextBox;
 	private readonly NumericUpDown verticalSpacingInput;
 	private readonly NumericUpDown verticalOffsetInput;
@@ -9,18 +13,26 @@ internal sealed class MainForm : Form
 	private readonly NumericUpDown horizontalOffsetInput;
 	private readonly TextBox outputPathTextBox;
 	private readonly Button drawButton;
+	private readonly PictureBox previewPictureBox;
+	private readonly Label previewStatusLabel;
 
 	public MainForm()
 	{
 		Text = "DrawGrid";
 		StartPosition = FormStartPosition.CenterScreen;
-		MinimumSize = new Size(640, 320);
-		ClientSize = new Size(720, 320);
+		MinimumSize = new Size(960, 560);
+		ClientSize = new Size(1100, 680);
+
+		splitContainer = new SplitContainer
+		{
+			Dock = DockStyle.Fill,
+			FixedPanel = FixedPanel.Panel1
+		};
 
 		var layout = new TableLayoutPanel
 		{
 			ColumnCount = 3,
-			Dock = DockStyle.Fill,
+			Dock = DockStyle.Top,
 			Padding = new Padding(16),
 			AutoSize = true
 		};
@@ -53,6 +65,23 @@ internal sealed class MainForm : Form
 			Anchor = AnchorStyles.Right
 		};
 
+		previewPictureBox = new PictureBox
+		{
+			Dock = DockStyle.Fill,
+			BorderStyle = BorderStyle.FixedSingle,
+			BackColor = Color.White,
+			SizeMode = PictureBoxSizeMode.Zoom
+		};
+
+		previewStatusLabel = new Label
+		{
+			Dock = DockStyle.Fill,
+			Text = "选择图片后会在这里预览输出效果。",
+			AutoEllipsis = true,
+			TextAlign = ContentAlignment.MiddleLeft,
+			Padding = new Padding(0, 6, 0, 0)
+		};
+
 		var browseButton = new Button
 		{
 			Text = "浏览...",
@@ -62,6 +91,11 @@ internal sealed class MainForm : Form
 
 		browseButton.Click += BrowseButton_Click;
 		drawButton.Click += DrawButton_Click;
+		imagePathTextBox.TextChanged += PreviewInputChanged;
+		verticalSpacingInput.ValueChanged += PreviewInputChanged;
+		verticalOffsetInput.ValueChanged += PreviewInputChanged;
+		horizontalSpacingInput.ValueChanged += PreviewInputChanged;
+		horizontalOffsetInput.ValueChanged += PreviewInputChanged;
 
 		layout.Controls.Add(CreateLabel("图片文件"), 0, 0);
 		layout.Controls.Add(imagePathTextBox, 1, 0);
@@ -91,8 +125,38 @@ internal sealed class MainForm : Form
 
 		layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
 
-		Controls.Add(layout);
+		var previewLayout = new TableLayoutPanel
+		{
+			ColumnCount = 1,
+			Dock = DockStyle.Fill,
+			Padding = new Padding(16)
+		};
+
+		previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+		previewLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+		previewLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+
+		previewLayout.Controls.Add(CreateLabel("输出预览"), 0, 0);
+		previewLayout.Controls.Add(previewPictureBox, 0, 1);
+		previewLayout.Controls.Add(previewStatusLabel, 0, 2);
+
+		splitContainer.Panel1.Controls.Add(layout);
+		splitContainer.Panel2.Controls.Add(previewLayout);
+
+		Controls.Add(splitContainer);
 		AcceptButton = drawButton;
+		Shown += MainForm_Shown;
+		UpdatePreview();
+	}
+
+	protected override void Dispose(bool disposing)
+	{
+		if (disposing)
+		{
+			ReplacePreviewImage(null);
+		}
+
+		base.Dispose(disposing);
 	}
 
 	private static Label CreateLabel(string text) => new()
@@ -126,6 +190,20 @@ internal sealed class MainForm : Form
 		{
 			imagePathTextBox.Text = dialog.FileName;
 		}
+	}
+
+	private void PreviewInputChanged(object? sender, EventArgs e)
+	{
+		UpdatePreview();
+	}
+
+	private void MainForm_Shown(object? sender, EventArgs e)
+	{
+		splitContainer.Panel1MinSize = LeftPanelMinWidth;
+		splitContainer.Panel2MinSize = RightPanelMinWidth;
+
+		var maxLeftWidth = Math.Max(LeftPanelMinWidth, splitContainer.ClientSize.Width - RightPanelMinWidth);
+		splitContainer.SplitterDistance = Math.Min(Math.Max(InitialLeftPanelWidth, LeftPanelMinWidth), maxLeftWidth);
 	}
 
 	private void DrawButton_Click(object? sender, EventArgs e)
@@ -164,6 +242,43 @@ internal sealed class MainForm : Form
 	private void ShowError(string message)
 	{
 		MessageBox.Show(this, message, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+	}
+
+	private void UpdatePreview()
+	{
+		outputPathTextBox.Clear();
+
+		if (string.IsNullOrWhiteSpace(imagePathTextBox.Text))
+		{
+			ReplacePreviewImage(null);
+			previewStatusLabel.Text = "选择图片后会在这里预览输出效果。";
+			return;
+		}
+
+		try
+		{
+			var previewImage = GridDrawer.CreateGridBitmap(
+				imagePathTextBox.Text,
+				DecimalToInt(verticalSpacingInput.Value),
+				DecimalToInt(verticalOffsetInput.Value),
+				DecimalToInt(horizontalSpacingInput.Value),
+				DecimalToInt(horizontalOffsetInput.Value));
+
+			ReplacePreviewImage(previewImage);
+			previewStatusLabel.Text = $"预览已更新，尺寸：{previewImage.Width} x {previewImage.Height}";
+		}
+		catch (Exception ex)
+		{
+			ReplacePreviewImage(null);
+			previewStatusLabel.Text = $"无法预览：{ex.Message}";
+		}
+	}
+
+	private void ReplacePreviewImage(Image? image)
+	{
+		var oldImage = previewPictureBox.Image;
+		previewPictureBox.Image = image;
+		oldImage?.Dispose();
 	}
 
 	private static int DecimalToInt(decimal value) => decimal.ToInt32(value);

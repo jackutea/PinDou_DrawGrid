@@ -22,6 +22,51 @@ internal static class GridDrawer
 		int horizontalSpacing,
 		int horizontalOffset)
 	{
+		var extension = ValidateArguments(imagePath, verticalSpacing, verticalOffset, horizontalSpacing, horizontalOffset);
+		using var canvas = CreateGridBitmap(imagePath, verticalSpacing, verticalOffset, horizontalSpacing, horizontalOffset);
+		var outputPath = BuildOutputPath(imagePath);
+		canvas.Save(outputPath, GetImageFormat(extension));
+		return outputPath;
+	}
+
+	public static Bitmap CreateGridBitmap(
+		string imagePath,
+		int verticalSpacing,
+		int verticalOffset,
+		int horizontalSpacing,
+		int horizontalOffset)
+	{
+		ValidateArguments(imagePath, verticalSpacing, verticalOffset, horizontalSpacing, horizontalOffset);
+
+		using var sourceImage = Image.FromFile(imagePath);
+		var canvas = new Bitmap(sourceImage.Width, sourceImage.Height, PixelFormat.Format32bppArgb);
+
+		using (var graphics = Graphics.FromImage(canvas))
+		using (var lineBrush = new SolidBrush(Color.Red))
+		{
+			graphics.DrawImage(sourceImage, 0, 0, sourceImage.Width, sourceImage.Height);
+
+			for (var x = GetFirstVisibleCoordinate(verticalOffset, verticalSpacing); x < canvas.Width; x += verticalSpacing)
+			{
+				graphics.FillRectangle(lineBrush, x, 0, 1, canvas.Height);
+			}
+
+			for (var y = GetFirstVisibleCoordinate(horizontalOffset, horizontalSpacing); y < canvas.Height; y += horizontalSpacing)
+			{
+				graphics.FillRectangle(lineBrush, 0, y, canvas.Width, 1);
+			}
+		}
+
+		return canvas;
+	}
+
+	private static string ValidateArguments(
+		string imagePath,
+		int verticalSpacing,
+		int verticalOffset,
+		int horizontalSpacing,
+		int horizontalOffset)
+	{
 		if (!OperatingSystem.IsWindows())
 		{
 			throw new PlatformNotSupportedException("当前实现依赖 System.Drawing，仅支持 Windows。");
@@ -53,28 +98,7 @@ internal static class GridDrawer
 			throw new NotSupportedException("仅支持 .png、.bmp、.jpg 和 .jpeg 图片。");
 		}
 
-		using var sourceImage = Image.FromFile(imagePath);
-		using var canvas = new Bitmap(sourceImage.Width, sourceImage.Height, PixelFormat.Format32bppArgb);
-
-		using (var graphics = Graphics.FromImage(canvas))
-		using (var lineBrush = new SolidBrush(Color.Red))
-		{
-			graphics.DrawImage(sourceImage, 0, 0, sourceImage.Width, sourceImage.Height);
-
-			for (var x = GetFirstVisibleCoordinate(verticalOffset, verticalSpacing); x < canvas.Width; x += verticalSpacing)
-			{
-				graphics.FillRectangle(lineBrush, x, 0, 1, canvas.Height);
-			}
-
-			for (var y = GetFirstVisibleCoordinate(horizontalOffset, horizontalSpacing); y < canvas.Height; y += horizontalSpacing)
-			{
-				graphics.FillRectangle(lineBrush, 0, y, canvas.Width, 1);
-			}
-		}
-
-		var outputPath = BuildOutputPath(imagePath);
-		canvas.Save(outputPath, GetImageFormat(extension));
-		return outputPath;
+		return extension;
 	}
 
 	private static int GetFirstVisibleCoordinate(int offset, int spacing)
