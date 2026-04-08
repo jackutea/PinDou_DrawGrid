@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.Versioning;
 
@@ -69,19 +70,15 @@ internal static class GridDrawer
 		var canvas = new Bitmap(sourceImage.Width, sourceImage.Height, PixelFormat.Format32bppArgb);
 
 		using (var graphics = Graphics.FromImage(canvas))
-		using (var lineBrush = new SolidBrush(Color.Red))
+		using (var solidPen = CreateGridPen(isDashed: false))
+		using (var dashedPen = CreateGridPen(isDashed: true))
 		{
 			graphics.DrawImage(sourceImage, 0, 0, sourceImage.Width, sourceImage.Height);
+			graphics.SmoothingMode = SmoothingMode.None;
+			graphics.PixelOffsetMode = PixelOffsetMode.Half;
 
-			for (var x = GetFirstVisibleCoordinate(verticalOffset, verticalSpacing); x < canvas.Width; x += verticalSpacing)
-			{
-				graphics.FillRectangle(lineBrush, x, 0, 1, canvas.Height);
-			}
-
-			for (var y = GetFirstVisibleCoordinate(horizontalOffset, horizontalSpacing); y < canvas.Height; y += horizontalSpacing)
-			{
-				graphics.FillRectangle(lineBrush, 0, y, canvas.Width, 1);
-			}
+			DrawVerticalLines(graphics, canvas.Width, canvas.Height, verticalOffset, verticalSpacing, solidPen, dashedPen);
+			DrawHorizontalLines(graphics, canvas.Width, canvas.Height, horizontalOffset, horizontalSpacing, solidPen, dashedPen);
 		}
 
 		return canvas;
@@ -150,15 +147,54 @@ internal static class GridDrawer
 		return extension;
 	}
 
-	private static int GetFirstVisibleCoordinate(int offset, int spacing)
+	private static void DrawVerticalLines(Graphics graphics, int width, int height, int offset, int spacing, Pen solidPen, Pen dashedPen)
+	{
+		var (x, lineIndex) = GetFirstVisibleCoordinateAndLineIndex(offset, spacing);
+		for (; x < width; x += spacing, lineIndex++)
+		{
+			var pen = IsOddLine(lineIndex) ? solidPen : dashedPen;
+			graphics.DrawLine(pen, x, 0, x, height - 1);
+		}
+	}
+
+	private static void DrawHorizontalLines(Graphics graphics, int width, int height, int offset, int spacing, Pen solidPen, Pen dashedPen)
+	{
+		var (y, lineIndex) = GetFirstVisibleCoordinateAndLineIndex(offset, spacing);
+		for (; y < height; y += spacing, lineIndex++)
+		{
+			var pen = IsOddLine(lineIndex) ? solidPen : dashedPen;
+			graphics.DrawLine(pen, 0, y, width - 1, y);
+		}
+	}
+
+	private static Pen CreateGridPen(bool isDashed)
+	{
+		var pen = new Pen(Color.Red, 1F);
+		if (isDashed)
+		{
+			pen.DashStyle = DashStyle.Dash;
+			pen.DashPattern = new float[] { 4F, 4F };
+		}
+
+		return pen;
+	}
+
+	private static (int Coordinate, int LineIndex) GetFirstVisibleCoordinateAndLineIndex(int offset, int spacing)
 	{
 		var coordinate = offset;
+		var lineIndex = 1;
 		while (coordinate < 0)
 		{
 			coordinate += spacing;
+			lineIndex++;
 		}
 
-		return coordinate;
+		return (coordinate, lineIndex);
+	}
+
+	private static bool IsOddLine(int lineIndex)
+	{
+		return lineIndex % 2 != 0;
 	}
 
 	private static string BuildOutputPath(string imagePath)
