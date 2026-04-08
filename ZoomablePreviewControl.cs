@@ -12,6 +12,8 @@ internal sealed class ZoomablePreviewControl : Panel
 	private float fitScale = 1F;
 	private float relativeZoom = 1F;
 	private Size scaledImageSize = Size.Empty;
+	private bool isPanning;
+	private Point lastMousePosition;
 
 	public ZoomablePreviewControl()
 	{
@@ -61,12 +63,64 @@ internal sealed class ZoomablePreviewControl : Panel
 	{
 		base.OnMouseEnter(eventArgs);
 		Focus();
+		UpdateCursor();
 	}
 
 	protected override void OnMouseDown(MouseEventArgs eventArgs)
 	{
 		base.OnMouseDown(eventArgs);
 		Focus();
+
+		if (eventArgs.Button == MouseButtons.Left && CanPan())
+		{
+			isPanning = true;
+			lastMousePosition = eventArgs.Location;
+			Capture = true;
+			Cursor = Cursors.SizeAll;
+		}
+	}
+
+	protected override void OnMouseMove(MouseEventArgs eventArgs)
+	{
+		base.OnMouseMove(eventArgs);
+
+		if (!isPanning)
+		{
+			UpdateCursor();
+			return;
+		}
+
+		var currentScrollOffset = GetCurrentScrollOffset();
+		var deltaX = eventArgs.X - lastMousePosition.X;
+		var deltaY = eventArgs.Y - lastMousePosition.Y;
+		var maxScrollOffset = GetMaxScrollOffset();
+		var targetX = Math.Clamp(currentScrollOffset.X - deltaX, 0, maxScrollOffset.Width);
+		var targetY = Math.Clamp(currentScrollOffset.Y - deltaY, 0, maxScrollOffset.Height);
+
+		AutoScrollPosition = new Point(targetX, targetY);
+		lastMousePosition = eventArgs.Location;
+	}
+
+	protected override void OnMouseUp(MouseEventArgs eventArgs)
+	{
+		base.OnMouseUp(eventArgs);
+
+		if (eventArgs.Button == MouseButtons.Left)
+		{
+			isPanning = false;
+			Capture = false;
+			UpdateCursor();
+		}
+	}
+
+	protected override void OnMouseLeave(EventArgs eventArgs)
+	{
+		base.OnMouseLeave(eventArgs);
+
+		if (!isPanning)
+		{
+			Cursor = Cursors.Default;
+		}
 	}
 
 	protected override void OnMouseWheel(MouseEventArgs eventArgs)
@@ -126,7 +180,10 @@ internal sealed class ZoomablePreviewControl : Panel
 		{
 			fitScale = 1F;
 			scaledImageSize = Size.Empty;
+			isPanning = false;
 			AutoScrollMinSize = Size.Empty;
+			AutoScrollPosition = Point.Empty;
+			Cursor = Cursors.Default;
 			Invalidate();
 			return;
 		}
@@ -136,6 +193,8 @@ internal sealed class ZoomablePreviewControl : Panel
 			Math.Max(1, (int)Math.Round(previewImage.Width * GetCurrentScale())),
 			Math.Max(1, (int)Math.Round(previewImage.Height * GetCurrentScale())));
 		AutoScrollMinSize = scaledImageSize;
+		ClampScrollOffset();
+		UpdateCursor();
 		Invalidate();
 	}
 
@@ -163,6 +222,41 @@ internal sealed class ZoomablePreviewControl : Panel
 		var x = AutoScrollPosition.X + Math.Max((ClientSize.Width - scaledImageSize.Width) / 2, 0);
 		var y = AutoScrollPosition.Y + Math.Max((ClientSize.Height - scaledImageSize.Height) / 2, 0);
 		return new Rectangle(x, y, scaledImageSize.Width, scaledImageSize.Height);
+	}
+
+	private bool CanPan()
+	{
+		return previewImage is not null && (scaledImageSize.Width > ClientSize.Width || scaledImageSize.Height > ClientSize.Height);
+	}
+
+	private Point GetCurrentScrollOffset()
+	{
+		return new Point(-AutoScrollPosition.X, -AutoScrollPosition.Y);
+	}
+
+	private Size GetMaxScrollOffset()
+	{
+		return new Size(
+			Math.Max(scaledImageSize.Width - ClientSize.Width, 0),
+			Math.Max(scaledImageSize.Height - ClientSize.Height, 0));
+	}
+
+	private void ClampScrollOffset()
+	{
+		var currentScrollOffset = GetCurrentScrollOffset();
+		var maxScrollOffset = GetMaxScrollOffset();
+		var clampedX = Math.Clamp(currentScrollOffset.X, 0, maxScrollOffset.Width);
+		var clampedY = Math.Clamp(currentScrollOffset.Y, 0, maxScrollOffset.Height);
+
+		if (clampedX != currentScrollOffset.X || clampedY != currentScrollOffset.Y)
+		{
+			AutoScrollPosition = new Point(clampedX, clampedY);
+		}
+	}
+
+	private void UpdateCursor()
+	{
+		Cursor = CanPan() ? Cursors.SizeAll : Cursors.Default;
 	}
 
 	private void OnZoomChanged()

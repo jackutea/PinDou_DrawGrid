@@ -310,7 +310,7 @@ internal sealed class MainForm : Form
 			return;
 		}
 
-		previewStatusLabel.Text = $"预览已更新，尺寸：{previewControl.PreviewImage.Width} x {previewControl.PreviewImage.Height}，缩放：{previewControl.ZoomPercentage:0}%（鼠标滚轮缩放）";
+		previewStatusLabel.Text = $"预览已更新，尺寸：{previewControl.PreviewImage.Width} x {previewControl.PreviewImage.Height}，缩放：{previewControl.ZoomPercentage:0}%（鼠标滚轮缩放，左键拖动平移）";
 	}
 
 	private void ReplacePreviewImage(Image? image)
